@@ -71,4 +71,5 @@ def check_news():
 
 if __name__ == "__main__":
     init_db()
+    send_line_message("🤖 สวัสดีครับ! ระบบ Railway News Hub เชื่อมต่อกับ LINE สำเร็จแล้ว")
     check_news()
