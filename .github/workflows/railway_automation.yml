@@ -2,8 +2,8 @@ name: Railway News Automation Cron
 
 on:
   schedule:
-    - cron: '*/15 * * * *' # ทำงานทุกๆ 15 นาที
-  workflow_dispatch: # เปิดให้กดรันมือได้
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
 
 jobs:
   run-scraper:
@@ -35,3 +35,11 @@ jobs:
           LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
         run: |
           python backend/fetch_and_notify.py
+
+      - name: Commit & Push JSON Data to GitHub
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/news.json database.db
+          git commit -m "Auto-update railway news data" || exit 0
+          git push
