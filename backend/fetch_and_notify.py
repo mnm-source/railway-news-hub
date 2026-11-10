@@ -9,12 +9,21 @@ from datetime import datetime
 LINE_TOKEN = os.environ.get("LINE_CHANNEL_ACCESS_TOKEN")
 USER_ID = os.environ.get("LINE_USER_ID")
 
+# รายชื่อ RSS Feeds
 RSS_FEEDS = [
     {"name": "Thai PBS", "country": "Thailand", "url": "https://news.thaipbs.or.th/rss/news/general.xml"},
     {"name": "Bangkok Post", "country": "Thailand", "url": "https://www.bangkokpost.com/rss/data/topstories.xml"},
     {"name": "BBC World", "country": "International", "url": "http://feeds.bbci.co.uk/news/rss.xml"}
 ]
 
+# 1. คีย์เวิร์ดบังคับว่าต้องเกี่ยวกับ "รถไฟฟ้า/ระบบราง" ถึงจะเก็บข่าวนี้
+RAILWAY_KEYWORDS = [
+    "รถไฟ", "รถไฟฟ้า", "mrt", "bts", "แอร์พอร์ตลิงก์", "รถไฟใต้ดิน", 
+    "รถไฟความเร็วสูง", "ระบบราง", "ชานชาลา", "รถไฟฟ้าราย", 
+    "train", "railway", "metro", "subway", "skytrain", "rail"
+]
+
+# 2. คีย์เวิร์ดสำหรับตรวจจับอุบัติเหตุร้ายแรงเพื่อแจ้งเตือน LINE
 ACCIDENT_KEYWORDS = ["รถไฟชน", "รถไฟตกราง", "รถไฟฟ้าขัดข้อง", "train derailment", "train crash", "rail accident"]
 
 def init_db():
@@ -48,9 +57,17 @@ def check_news():
 
     for feed_info in RSS_FEEDS:
         feed = feedparser.parse(feed_info["url"])
-        for entry in feed.entries[:10]:
+        for entry in feed.entries:
             title = entry.title
             link = entry.link
+            
+            # ตรวจสอบว่าหัวข้อข่าวมีคำที่เกี่ยวกับ "รถไฟฟ้า/ระบบราง" หรือไม่
+            is_railway_news = any(kw.lower() in title.lower() for kw in RAILWAY_KEYWORDS)
+            
+            # ถ้าไม่ใช่ข่าวรถไฟฟ้า ให้ข้ามไปเลย (ไม่เอาข่าวการเมืองทั่วไป, บันเทิง ฯลฯ)
+            if not is_railway_news:
+                continue
+
             news_id = hashlib.md5(link.encode()).hexdigest()
             published = str(datetime.now().strftime("%Y-%m-%d %H:%M"))
 
@@ -60,6 +77,7 @@ def check_news():
                           (news_id, title, link, feed_info["name"], feed_info["country"], published))
                 conn.commit()
 
+                # ตรวจสอบอุบัติเหตุร้ายแรงเพื่อส่ง LINE
                 is_accident = any(kw.lower() in title.lower() for kw in ACCIDENT_KEYWORDS)
                 if is_accident:
                     alert_msg = f"🚨 RAILWAY EMERGENCY ALERT\n\nแหล่งข่าว: {feed_info['name']}\nหัวข้อ: {title}\n\nอ่านข่าวเต็ม:\n{link}"
@@ -77,7 +95,7 @@ def check_news():
                 "is_accident": any(kw.lower() in title.lower() for kw in ACCIDENT_KEYWORDS)
             })
 
-    # สร้างโฟลเดอร์ data และบันทึกเป็น news.json สำหรับ Frontend ดึงไปแสดง
+    # บันทึกเฉพาะข่าวรถไฟฟ้าลง news.json
     os.makedirs("data", exist_ok=True)
     with open("data/news.json", "w", encoding="utf-8") as f:
         json.dump(all_articles, f, ensure_ascii=False, indent=2)
